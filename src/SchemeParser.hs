@@ -241,7 +241,7 @@ schemeCondBranches =
 
 schemeCond = parens $ reserved "cond" >> desugarCond <$> schemeCondBranches
 
-schemeAnd = 
+schemeAnd =
   parens $ do
     reserved "and"
     exprs <- schemeExpr `sepBy` space
@@ -249,7 +249,7 @@ schemeAnd =
                 (Const (Boolean True)) exprs)
 
 -- Danger!  We're writing unhygienic macros!
-schemeOr = 
+schemeOr =
   parens $ do
     reserved "or"
     exprs <- schemeExpr `sepBy` space
@@ -284,8 +284,8 @@ readExpr = parse parseExpr ""
 
 readProg = parse schemeProgram ""
 
-schemeProgram :: Parser Expr
-schemeProgram = desugarProgram <$> (space >> prog) <* eof
+schemeProgram :: Parser Program
+schemeProgram = (space >> prog) <* eof
   where prog = fromList <$> ((Right <$> schemeDefn) <||> (Left <$> schemeCommand)) `sepEndBy1` space
 
 schemeDefn :: Parser Defn

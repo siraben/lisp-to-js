@@ -1,10 +1,12 @@
+{-# LANGUAGE NoMonomorphismRestriction #-}
 module Translation where
 
 import SchemeTypes
 import Language.JavaScript.Parser.Parser
 import Language.JavaScript.Parser.AST
 import Control.Monad.Except
-import Data.Foldable
+import Data.Foldable hiding (toList)
+import Data.List.NonEmpty
 
 -- Language.JavaScript.Parser.AST has a lot of annoying annotations to
 -- fill in, so we put JSNoAnnot for the annotation
@@ -80,3 +82,25 @@ convertExprStmt l e = do forms <- f (((`JSExpressionStatement` (JSSemi nn)) <$>)
   where
     f b = do e' <- convert e
              ((++ [jsReturn e']) <$> b)
+
+jsVarInit e = JSVarInit nn e
+jsVar i e = JSVariable nn (JSLOne (JSVarInitExpression (jsIdent i) (jsVarInit e))) JSSemiAuto
+
+jsFunc f params body = JSFunction nn
+                                  (JSIdentName nn f)
+                                  nn
+                                  (jsCommaList params)
+                                  nn
+                                  (JSBlock nn body nn)
+                                  JSSemiAuto
+
+
+-- convertP :: Program -> NonEmpty (Either String JSExpression)
+convertP p = (`JSAstProgram` nn) <$> traverse f (toList p)
+  where
+    f (Left e) = jsExprStmt <$> convert e
+    f (Right (Defn1 f e)) = do e' <- convert e
+                               pure (jsVar f e')
+    f (Right (Defn2 f args cmds e)) = do e' <- convert (Lambda args cmds e)
+                                         pure (jsVar f e')
+

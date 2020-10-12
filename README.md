@@ -38,13 +38,13 @@ evaluate it.
 ### Usage Examples
 ```js
 lisp-to-js> (define (fact n) (if (= n 0) 1 (* n (fact (- n 1))))) (fact 6)
-((fact)=>(()=>{fact=((n)=>(n==0)?1:n*fact(n-1-0)*1);return(fact(6))})())(null)
+var fact=((n)=>(n==0)?1:n*fact(n-1-0)*1);fact(6)
 lisp-to-js> (define a 1) (define b 3) a
-((a)=>((b)=>(()=>{a=1;b=3;return(a)})())(null))(null)
+var a=1,b=3;a
 lisp-to-js> (define a 3) (set! a 10) a
-((a)=>(()=>{a=3;a=10;return(a)})())(null)
+var a=3;a=10;a
 lisp-to-js> (cond ((= 1 2) "hello") ((= 3 1) "foo") (#t "bar"))
-(()=>(1==2)?"hello":(3==1)?"foo":true?"bar":false?null:null)()
+(1==2)?"hello":(3==1)?"foo":true?"bar":false?null:null
 ```
 ## Scheme AST as a Haskell Datatype
 The Scheme program:
