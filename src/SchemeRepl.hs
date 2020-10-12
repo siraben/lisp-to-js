@@ -35,7 +35,7 @@ repl = do
         then repl
         else case reval (T.unpack exp) of
                Right res -> TI.putStrLn (renderToText (minifyJS res))
-               Left f -> TI.putStrLn ("failed: " <> (T.pack f))
+               Left f -> TI.putStrLn ("failed: " <> f)
       repl
 
 -- -- |Read, evaluate and print a file.

@@ -8,5 +8,5 @@ import SchemeRepl
 
 main :: IO ()
 main = do
-  putStrLn "Welcome to the r5rs-denot, the R5RS Scheme interpreter based on\ndenotational semantics.  Input an expression and press Enter to\nevaluate.  Press Control-d to exit.\n"
+  putStrLn "Welcome to the lisp-to-js, the Lisp to JS transpiler.\nInput an expression and press Enter to evaluate.\nPress Control-d to exit.\n"
   repl

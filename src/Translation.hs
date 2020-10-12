@@ -1,12 +1,12 @@
-{-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Translation where
 
 import SchemeTypes
-import Language.JavaScript.Parser.Parser
+import qualified Language.JavaScript.Parser.Parser as P
 import Language.JavaScript.Parser.AST
 import Control.Monad.Except
-import Data.Foldable hiding (toList)
 import Data.List.NonEmpty
+import qualified Data.Text.Lazy as T
 
 -- Language.JavaScript.Parser.AST has a lot of annoying annotations to
 -- fill in, so we put JSNoAnnot for the annotation
@@ -35,16 +35,21 @@ toProgram e = JSAstProgram [jsExprStmt e] nn
 
 binOps = [("+", add), ("*", mul), ("-", sub), ("=", eq)]
   where
-    add = foldrM (\a r -> do { a' <- convert a; pure (jsBinOp (JSBinOpPlus nn) a' r)}) (jsDec 0)
-    mul = foldrM (\a r -> do { a' <- convert a; pure (jsBinOp (JSBinOpTimes nn) a' r)}) (jsDec 1)
-    sub = foldrM (\a r -> do { a' <- convert a; pure (jsBinOp (JSBinOpMinus nn) a' r)}) (jsDec 0)
+    add [] = pure (jsDec 0)
+    add l = foldr1 (\a r -> jsBinOp (JSBinOpPlus nn) a r) <$> (traverse convert l)
+    mul [] = pure (jsDec 1)
+    mul l = foldr1 (\a r -> jsBinOp (JSBinOpTimes nn) a r) <$> (traverse convert l)
+
+    sub [] = throwError "Wrong number of arguments to -"
+    sub l = foldr1 (\a r -> jsBinOp (JSBinOpMinus nn) a r) <$> (traverse convert l)
+
     eq [a,b] = do a' <- convert a
                   b' <- convert b
                   pure (jsParens (jsBinOp (JSBinOpEq nn) a' b'))
-    eq _ = throwError "too many arguments to ="
+    eq _ = throwError "Wrong number of arguments to ="
 
 
-convert :: Expr -> Either String JSExpression
+convert :: Expr -> Either T.Text JSExpression
 convert (Const Nil) = pure (jsLit "null")
 convert (Const (Character c)) = pure (jsString [c])
 -- Symbols become strings
@@ -76,7 +81,7 @@ convert (Set s e) = jsSet s <$> convert e
 
 convert _ = throwError "Not supported"
 
-convertExprStmt :: [Expr] -> Expr -> Either String JSStatement
+convertExprStmt :: [Expr] -> Expr -> Either T.Text JSStatement
 convertExprStmt l e = do forms <- f (((`JSExpressionStatement` (JSSemi nn)) <$>) <$> traverse convert l)
                          pure (JSStatementBlock nn forms nn JSSemiAuto)
   where
@@ -95,7 +100,7 @@ jsFunc f params body = JSFunction nn
                                   JSSemiAuto
 
 
--- convertP :: Program -> NonEmpty (Either String JSExpression)
+convertP :: Program -> Either T.Text JSAST
 convertP p = (`JSAstProgram` nn) <$> traverse f (toList p)
   where
     f (Left e) = jsExprStmt <$> convert e
