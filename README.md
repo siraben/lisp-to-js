@@ -51,9 +51,21 @@ The Scheme program:
 ```scheme
 ((lambda (x) (+ x x)) 10)
 ```
+
 Can be written in the Haskell `Expr` datatype as:
+
 ```haskell
 prog = App (Lambda ["x"] [] (App (Id "+") [Id "x", Id "x"])) [Const (Number 10)]
 ```
 
-Which will then be converted to a JavaScript AST.
+Which will then be converted into a minified JavaScript AST.
+
+```haskell
+JSAstProgram [JSExpressionStatement (JSMemberExpression (JSExpressionParen JSNoAnnot (JSArrowExpression (JSParenthesizedArrowParameterList JSNoAnnot (JSLOne (JSIdentifier JSNoAnnot "x")) JSNoAnnot) JSNoAnnot (JSExpressionStatement (JSExpressionBinary (JSIdentifier JSNoAnnot "x") (JSBinOpPlus JSNoAnnot) (JSIdentifier JSNoAnnot "x")) JSSemiAuto)) JSNoAnnot) JSNoAnnot (JSLOne (JSDecimal JSNoAnnot "10")) JSNoAnnot) JSSemiAuto] JSNoAnnot
+```
+
+Which gets pretty-printed into a JavaScript program.
+
+```js
+((x)=>x+x)(10)
+```
