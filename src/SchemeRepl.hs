@@ -1,25 +1,23 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-|
 Module      : SchemeRepl
-Description : REPL for LispToJS
-
+Description : REPL for lisp-to-js
 -}
 module SchemeRepl where
 
-import Translation
-import SchemeParser
-import SchemeTypes
-import System.Exit
-import System.IO
-import qualified Data.Text.Lazy.IO as TI
-import qualified Data.Text.Lazy as T
-import Language.JavaScript.Pretty.Printer
-import Language.JavaScript.Process.Minify
+import           Translation
+import           SchemeParser
+import           SchemeTypes
+import           System.Exit
+import           System.IO
+import qualified Data.Text.Lazy.IO             as TI
+import qualified Data.Text.Lazy                as T
+import           Language.JavaScript.Pretty.Printer
+import           Language.JavaScript.Process.Minify
 
-reval s =
-  case readProg s of
-    Right res -> convertP res
-    Left err  -> Left "failed to parse"
+reval s = case readProg s of
+  Right res -> convertP res
+  Left  err -> Left "failed to parse"
 
 -- |The main REPL loop.
 repl :: IO ()
@@ -34,8 +32,8 @@ repl = do
       if exp == ""
         then repl
         else case reval (T.unpack exp) of
-               Right res -> TI.putStrLn (renderToText (minifyJS res))
-               Left f -> TI.putStrLn ("failed: " <> f)
+          Right res -> TI.putStrLn (renderToText (minifyJS res))
+          Left  f   -> TI.putStrLn ("failed: " <> f)
       repl
 
 -- -- |Read, evaluate and print a file.

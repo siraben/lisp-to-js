@@ -6,8 +6,8 @@ As defined in the R5RS standard.
 -}
 module SchemeTypes where
 
-import qualified Data.IntMap as M
-import Data.List.NonEmpty
+import qualified Data.IntMap                   as M
+import           Data.List.NonEmpty
 
 -- |Locations
 type L = Int
@@ -42,13 +42,13 @@ data Con
   deriving (Eq)
 
 instance Show Con where
-  show (Symbol q) = q
-  show (String s) = show s
-  show (Character h) = "#\\" <> [h]
-  show (Number r) = show r
-  show (Boolean True) = "#t"
-  show (Boolean False) = "#f"
-  show Nil = "()"
+  show (Symbol    q    ) = q
+  show (String    s    ) = show s
+  show (Character h    ) = "#\\" <> [h]
+  show (Number    r    ) = show r
+  show (Boolean   True ) = "#t"
+  show (Boolean   False) = "#f"
+  show Nil               = "()"
 
 -- |Expressed values
 data E
@@ -60,29 +60,28 @@ data E
   | Ef F
 
 instance Show E where
-  show (Ek con) = show con
+  show (Ek con          ) = show con
   show (Ep (car, cdr, _)) = concat ["~(", show car, " . ", show cdr, ")"]
-  show (Ev (l, _)) = show l
-  show (Es (l, _)) = show l
-  show (Em m) = show m
-  show (Ef _) = "#<procedure>"
+  show (Ev (l, _)       ) = show l
+  show (Es (l, _)       ) = show l
+  show (Em m            ) = show m
+  show (Ef _            ) = "#<procedure>"
 
 -- |Show an expression, but in full (i.e. follow recursively go down
 -- the @car@ and @cdr@ of the value in the given store.
 showFull :: E -> S -> String
 showFull l s = show' l
-  where
-    show' e@(Ep _) = "(" <> showPair e s <> ")"
-    show' a = show a
+ where
+  show' e@(Ep _) = "(" <> showPair e s <> ")"
+  show' a        = show a
 
 -- |Given a pair and an environment, show it.
 showPair (Ek Nil) _ = ""
 showPair (Ep (a, b, _)) s@(_, m) =
-  showFull (fst (m M.! a)) s <>
-  case fst (m M.! b) of
+  showFull (fst (m M.! a)) s <> case fst (m M.! b) of
     rest@(Ep _) -> " " <> showPair rest s
-    Ek Nil -> ""
-    val -> " . " <> showFull val s
+    Ek Nil      -> ""
+    val         -> " . " <> showFull val s
 showPair _ _ = error "non-pair argument to showPair"
 
 -- |Miscellaneous values
@@ -94,17 +93,17 @@ data M
   deriving (Eq)
 
 instance Show M where
-  show (Boom True) = "#t"
+  show (Boom True ) = "#t"
   show (Boom False) = "#f"
-  show Null = "null"
-  show Unspecified = "#<unspecified>"
-  show Undefined = "#<undefined>"
+  show Null         = "null"
+  show Unspecified  = "#<unspecified>"
+  show Undefined    = "#<undefined>"
 
 -- |Procedures
 type F = (L, [E] -> K -> C)
 
 -- |Stores
-type S = (Int, M.IntMap (E,T))
+type S = (Int, M.IntMap (E, T))
 
 -- |Environment
 type U = [(Ide, L)]

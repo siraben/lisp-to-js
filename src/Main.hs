@@ -4,9 +4,10 @@ Description : Main entry point for r5rs-denot Scheme.
 
 -}
 module Main where
-import SchemeRepl
+import           SchemeRepl
 
 main :: IO ()
 main = do
-  putStrLn "Welcome to the lisp-to-js, the Lisp to JS transpiler.\nInput an expression and press Enter to evaluate.\nPress Control-d to exit.\n"
+  putStrLn
+    "Welcome to the lisp-to-js, the Lisp to JS transpiler.\nInput an expression and press Enter to evaluate.\nPress Control-d to exit.\n"
   repl
