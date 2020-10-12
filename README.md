@@ -1,0 +1,59 @@
+# Compiling Lisp to JavaScript
+Currently based on [r5rs-denot](github.com/siraben/r5rs-denot), but
+will diverge significantly in code generation and core syntax.  Also,
+there is no evaluator here, just a transpiler from Lisp to JavaScript. 
+
+Excluding the variadic lambda forms, all the syntax below can
+currently be converted to JavaScript.
+
+```text
+(if <expr> <expr> <expr>)
+(if <expr> <expr>)
+(set! <id> <expr>)
+(lambda <id>* <expr>*)
+(lambda <id> <expr>*)
+(lambda (<id>* . <id>) <expr>*)
+(<expr> <expr>*)
+```
+
+Some of the following derived forms have been implemented.
+
+```text
+(define <id> <expr>)
+(define (<id> <id>*) <expr>*)
+(define (<id>* . <id>) <expr>*)
+'<expr>
+(begin <expr>*)
+(cond (<expr> <expr>)*)
+(let ((<id> <expr>)*) <expr>*)
+(letrec ((<id> <expr>)) <expr>*)
+(and <expr>*)
+(or <expr>*)
+```
+
+Ensure Cabal is installed and build this project by running `cabal
+run`.  The REPL will boot up.  Type an expression and hit ENTER to
+evaluate it.
+
+### Usage Examples
+```js
+lisp-to-js> (define (fact n) (if (= n 0) 1 (* n (fact (- n 1))))) (fact 6)
+((fact)=>(()=>{fact=((n)=>(n==0)?1:n*fact(n-1-0)*1);return(fact(6))})())(null)
+lisp-to-js> (define a 1) (define b 3) a
+((a)=>((b)=>(()=>{a=1;b=3;return(a)})())(null))(null)
+lisp-to-js> (define a 3) (set! a 10) a
+((a)=>(()=>{a=3;a=10;return(a)})())(null)
+lisp-to-js> (cond ((= 1 2) "hello") ((= 3 1) "foo") (#t "bar"))
+(()=>(1==2)?"hello":(3==1)?"foo":true?"bar":false?null:null)()
+```
+## Scheme AST as a Haskell Datatype
+The Scheme program:
+```scheme
+((lambda (x) (+ x x)) 10)
+```
+Can be written in the Haskell `Expr` datatype as:
+```haskell
+prog = App (Lambda ["x"] [] (App (Id "+") [Id "x", Id "x"])) [Const (Number 10)]
+```
+
+Which will then be converted to a JavaScript AST.
