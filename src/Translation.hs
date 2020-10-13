@@ -3,13 +3,14 @@
 module Translation where
 
 import           Control.Monad.Except
-import           Data.List.NonEmpty
+import qualified Data.List.NonEmpty            as N
 import qualified Data.Map                      as M
 import qualified Data.Text.Lazy                as T
 import           Language.JavaScript.Parser.AST
 import qualified Language.JavaScript.Parser.Parser
                                                as P
 import           SchemeTypes
+import           Data.List
 
 -- Language.JavaScript.Parser.AST has a lot of annoying annotations to
 -- fill in, so we put JSNoAnnot for the annotation
@@ -27,26 +28,9 @@ jsParens e = JSExpressionParen nn e nn
 jsBinOp op l = JSExpressionBinary l op
 jsArrow params =
   JSArrowExpression (JSParenthesizedArrowParameterList nn params nn) nn
--- jsCons car cdr = JSMemberExpression (jsIdent "Object") nn (jsCommaList [JSObjectLiteral nn ])
 
-jsCons car cdr = JSMemberExpression
-  (jsIdent "Object")
-  nn
-  (JSLOne
-    (JSObjectLiteral
-      nn
-      (JSCTLNone
-        (jsCommaList
-          [ JSPropertyNameandValue (JSPropertyIdent nn "car") nn [car]
-          , JSPropertyNameandValue (JSPropertyIdent nn "cdr") nn [cdr]
-          ]
-        )
-      )
-      nn
-    )
-  )
-  nn
-
+-- jsCons a b = JSMemberExpression (JSMemberDot (jsArrayLit [a]) nn (JSIdentifier nn "concat")) nn (JSLOne b) nn
+jsCons a b = jsArrayLit [a, b]
 jsMemberDot o p = JSMemberDot o nn (jsIdent p)
 
 jsCommaList :: [a] -> JSCommaList a
@@ -56,11 +40,14 @@ jsCommaList = foldl f JSLNil
   f JSLNil e = JSLOne e
   f r      e = JSLCons r nn e
 
+jsArrayComma = JSArrayComma nn
+jsArrayLit l =
+  JSArrayLiteral nn (intersperse jsArrayComma (JSArrayElement <$> l)) nn
 toProgram e = JSAstProgram [jsExprStmt e] nn
 
 replace a b = fmap $ \c -> if c == a then b else c
 sanitizeIdent = foldr ((.) . uncurry replace) id subs
-  where subs = [('-', '_'), ('?', 'p')]
+  where subs = [('-', '_'), ('?', 'p'), ('>', 'g')]
 
 binOps = M.fromList
   [ ("+"            , add)
@@ -77,6 +64,7 @@ binOps = M.fromList
   , ("eqv?"         , eqv)
   , ("null?"        , nullp)
   , ("symbol?"      , symbolp)
+  , ("apply"        , apply)
   ]
  where
   wrongArgsError s = throwError ("Wrong number of arguments to " <> s)
@@ -95,20 +83,32 @@ binOps = M.fromList
   lt [a, b] = jsBinOp (JSBinOpLt nn) <$> convert a <*> convert b
   lt _      = wrongArgsError "<"
 
+  and [a, b] = jsBinOp (JSBinOpAnd nn) <$> convert a <*> convert b
+  and _      = wrongArgsError "and"
+
+  or [a, b] = jsBinOp (JSBinOpOr nn) <$> convert a <*> convert b
+  or _      = wrongArgsError "or"
+
 
   cons [a, b] = jsCons <$> convert a <*> convert b
   cons _      = wrongArgsError "cons"
 
-  car [a] = jsMemberDot <$> convert a <*> pure "car"
+  car [a] = (jsCar <$> convert a)
   car _   = wrongArgsError "car"
 
-  cdr [a] = jsMemberDot <$> convert a <*> pure "cdr"
+  cdr [a] = (jsCdr <$> convert a)
   cdr _   = wrongArgsError "cdr"
 
-  nullp [a] = convert (App (Id "eqv?") [a, Const Nil])
-  nullp _   = wrongArgsError "null?"
+  nullp [a] = do
+    a' <- convert a
+    pure
+      (jsBinOp (JSBinOpEq nn)
+               (JSMemberDot a' nn (JSIdentifier nn "length"))
+               (jsDec 0)
+      )
+  nullp _ = wrongArgsError "null?"
 
-  list l = foldr jsCons (jsLit "null") <$> traverse convert l
+  list l = foldr jsCons (jsArrayLit []) <$> traverse convert l
 
   modulo [a, b] = jsBinOp (JSBinOpMod nn) <$> convert a <*> convert b
   modulo _      = wrongArgsError "modulo"
@@ -121,9 +121,42 @@ binOps = M.fromList
       (Const (String "string"))
   symbolp _ = wrongArgsError "symbol?"
 
+  apply [a, b] = jsApply <$> convert a <*> (jsFlatInf <$> convert b)
+  apply _      = wrongArgsError "apply"
 
+jsCar l = jsParens (JSMemberSquare l nn (JSDecimal nn "0") nn)
+jsCdr l = jsParens (JSMemberSquare l nn (JSDecimal nn "1") nn)
+jsFlatInf l = jsParens
+  (JSMemberExpression (JSMemberDot l nn (JSIdentifier nn "flat"))
+                      nn
+                      (JSLOne (jsIdent "Infinity"))
+                      nn
+  )
+
+jsVVLam argl b = jsParens yy
+ where
+  yy = jsArrow
+    (jsCommaList [JSSpreadExpression nn (jsIdent argl)])
+    (JSMethodCall
+      b
+      nn
+      (JSLOne
+        (JSMemberExpression
+          (JSMemberDot (jsIdent argl) nn (JSIdentifier nn "reduceRight"))
+          nn
+          jj
+          nn
+        )
+      )
+      nn
+      JSSemiAuto
+    )
+  bb = jsArrow (jsCommaList (jsIdent <$> ["a", "b"]))
+               (jsExprStmt (jsArrayLit (jsIdent <$> ["b", "a"])))
+  -- jj = (JSLCons (JSLOne (JSExpressionParen nn bb nn)) nn (JSArrayLiteral nn [] nn))
+  jj = jsCommaList [JSExpressionParen nn bb nn, jsArrayLit []]
 convert :: Expr -> Either T.Text JSExpression
-convert (Const Nil              ) = pure (jsLit "null")
+convert (Const Nil              ) = pure (jsArrayLit [])
 convert (Const (Character c    )) = pure (jsString [c])
 -- Symbols become strings
 convert (Const (Symbol    q    )) = pure (jsString q)
@@ -154,9 +187,10 @@ convert (Lambda params l e) = do
   params' <- jsCommaList <$> traverse (convert . Id) params
   b       <- convertExprStmt l e
   pure (jsParens (jsArrow params' b))
-convert (Set s e) = jsSet s <$> convert e
+convert (LambdaVV i l e) = jsVVLam <$> pure i <*> convert (Lambda [i] l e)
+convert (Set s e       ) = jsSet s <$> convert e
 
-convert _         = throwError "Not supported"
+convert e                = throwError ("Not supported: " <> T.pack (show e))
 
 convertExprStmt :: [Expr] -> Expr -> Either T.Text JSStatement
 convertExprStmt l e = do
@@ -172,6 +206,12 @@ jsVar i e = JSVariable
   (JSLOne (JSVarInitExpression (jsIdent i) (jsVarInit e)))
   JSSemiAuto
 
+jsApply f args = JSMemberExpression
+  (JSMemberDot (jsParens f) nn (JSIdentifier nn "apply"))
+  nn
+  (JSLCons (JSLOne (jsLit "null")) nn args)
+  nn
+
 jsFunc f params body = JSFunction nn
                                   (JSIdentName nn f)
                                   nn
@@ -182,7 +222,7 @@ jsFunc f params body = JSFunction nn
 
 
 convertP :: Program -> Either T.Text JSAST
-convertP p = (`JSAstProgram` nn) <$> traverse f (toList p)
+convertP p = (`JSAstProgram` nn) <$> traverse f (N.toList p)
  where
   f (Left  e                    ) = jsExprStmt <$> convert e
   f (Right (Defn1 f e          )) = jsVar f <$> convert e
