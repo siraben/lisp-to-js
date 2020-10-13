@@ -49,13 +49,13 @@ negnat = string "-" >> (-) 0 <$> natural
 -- |Parse a Scheme number.
 schemeNum = Const . Number <$> negnat <||> natural
 
--- |Apply a parser, then when it succeeds, return a constant.
+-- |Apply a parser, then when it succeeds, pure a constant.
 constLit :: Functor f => f a -> b -> f b
 constLit = ($>)
 
 -- |Parse a boolean.
-schemeBool = (char '#') *> ((string "t" *> return (Const (Boolean True))) <|>
-                            (string "f" *> return (Const (Boolean False))))
+schemeBool = (char '#') *> ((string "t" *> pure (Const (Boolean True))) <|>
+                            (string "f" *> pure (Const (Boolean False))))
 
 initp x = x `elem` concat [['a' .. 'z'], ['A' .. 'Z'], "!$%&*/:<=>?_~"]
 
@@ -87,24 +87,24 @@ dot = symb "."
 formals :: Parser ([Ide], Maybe Ide)
 formals =
   do x <- schemeId
-     return ([], Just x)
+     pure ([], Just x)
      <|> do
     lparen
     noArgs <- optionMaybe rparen
     case noArgs of
-      Just _ -> return ([], Nothing)
+      Just _ -> pure ([], Nothing)
       Nothing -> do
         names <- sepEndBy1 schemeId space
         rest <- optionMaybe (dot >> schemeId)
         rparen
-        return (names, rest)
+        pure (names, rest)
 
 schemeLambda =
   parens $ do
     reserved "lambda"
     fs <- tok formals
     exprs <- schemeExpr `sepBy1` space
-    return $
+    pure $
       let (cmds, expr) = unsnoc exprs
        in case fs of
             (args, Nothing)   -> Lambda args cmds expr
@@ -135,7 +135,7 @@ schemeQuotedList =
   parens $ do
     exprs <- schemeQuotable `sepBy1` space
     last <- optionMaybe (dot >> schemeQuotable)
-    return $
+    pure $
       case last of
         Nothing -> reifyQuotedList exprs
         Just a  -> reifyImproperList (exprs ++ [a])
@@ -147,7 +147,7 @@ schemeQuotable =
     -- Quoted list within a quoted list.
    do
     x <- schemeQuoted
-    return $
+    pure $
       App (Id "cons") [Const (Symbol "quote"), App (Id "cons") [x, Const Nil]]
 
 escChar = char '\\' *> (satisfy (`elem` "'\"\\") <|> (const '\n' <$> char 'n'))
@@ -162,11 +162,11 @@ schemeQuoteSpecialForm = symb "'" >> schemeQuotable
 schemeQuoted =
   schemeQuoteSpecialForm <|> parens (reserved "quote" >> schemeQuotable)
 
-schemeNil = lparen *> rparen *> return (Const Nil)
+schemeNil = lparen *> rparen *> pure (Const Nil)
 
 schemeApp = do
   (e:es) <- parens (schemeExpr `sepBy1` space)
-  return $ App e es
+  pure $ App e es
 
 schemeSet =
   parens (reserved "set!" *> (Set <$> tok schemeId <*> schemeExpr))
@@ -177,7 +177,7 @@ schemeIf =
     p <- tok schemeExpr
     c <- tok schemeExpr
     a <- optionMaybe schemeExpr
-    return $
+    pure $
       case a of
         Just a  -> If p c a
         Nothing -> IfPartial p c
@@ -237,7 +237,7 @@ schemeCondBranches =
   parens $ do
     p <- tok schemeExpr
     e <- schemeExpr
-    return (p, e)
+    pure (p, e)
 
 schemeCond = parens $ reserved "cond" >> desugarCond <$> schemeCondBranches
 
@@ -277,7 +277,7 @@ schemeCommand = schemeExpr
 
 parseExpr = wrapBegin <$> (space >> schemeExpr `sepEndBy1` space <* eof)
 
--- |Parse a string into a Scheme 'Expr', but return @Nothing@ if there
+-- |Parse a string into a Scheme 'Expr', but pure @Nothing@ if there
 -- was unconsumed input.
 readExpr :: String -> Either ParseError Expr
 readExpr = parse parseExpr ""

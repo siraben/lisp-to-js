@@ -1,6 +1,6 @@
 {-|
 Module      : Main
-Description : Main entry point for r5rs-denot Scheme.
+Description : Main entry point for lisp-to-js.
 
 -}
 module Main where
